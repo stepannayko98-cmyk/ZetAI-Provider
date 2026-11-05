@@ -83,11 +83,15 @@
   async function loadModels() {
     [providers, models] = await Promise.all([api('/providers'), api('/models')]);
     $('#modelProvider').innerHTML = providers.map((p) => `<option value="${p.id}">${esc(p.name)}</option>`).join('') || '<option value="">— сначала добавьте провайдера —</option>';
-    $('#modelsBody').innerHTML = models.map((m) => `<tr><td><b>${esc(m.name)}</b></td><td>${esc(m.provider_name || '—')}</td><td>${esc(m.upstream_model)}</td>
-      <td>${m.temperature ?? '—'}</td><td>${m.max_tokens ?? '—'}</td><td>${m.custom_system_prompt ? '✔' : '—'}</td>
+    $('#modelsBody').innerHTML = models.map((m) => {
+      const title = m.display_name ? `${esc(m.display_name)}<div class="muted small"><code>${esc(m.name)}</code></div>` : `<b>${esc(m.name)}</b>`;
+      const price = [m.price_input && `in ${esc(m.price_input)}`, m.price_output && `out ${esc(m.price_output)}`].filter(Boolean).join(' / ') || '—';
+      const cur = (m.price_input || m.price_output) ? ` <span class="muted">${esc(m.currency || 'USD')}</span>` : '';
+      return `<tr><td>${title}</td><td>${esc(m.provider_name || '—')}</td><td>${esc(m.upstream_model)}</td>
+      <td>${price}${cur}</td><td>${m.sort_order ?? 0}</td><td>${m.custom_system_prompt ? '✔' : '—'}</td>
       <td><label class="switch"><input type="checkbox" data-act="toggle" data-id="${m.id}" ${m.enabled ? 'checked' : ''}><span></span></label></td>
-      <td><button class="btn sm" data-act="medit" data-id="${m.id}">Изменить</button><button class="btn sm danger" data-act="mdel" data-id="${m.id}">Удалить</button></td></tr>`).join('')
-      || '<tr><td colspan="8" class="muted">Нет моделей</td></tr>';
+      <td><button class="btn sm" data-act="medit" data-id="${m.id}">Изменить</button><button class="btn sm danger" data-act="mdel" data-id="${m.id}">Удалить</button></td></tr>`;
+    }).join('') || '<tr><td colspan="8" class="muted">Нет моделей</td></tr>';
   }
   function resetModelForm() { const f = $('#modelForm'); f.reset(); f.id.value = ''; $('#modelFormTitle').textContent = 'Добавить модель'; $('#modelCancel').classList.add('hidden'); }
   $('#modelCancel').addEventListener('click', resetModelForm);
@@ -98,6 +102,12 @@
       temperature: f.temperature.value === '' ? null : Number(f.temperature.value),
       max_tokens: f.max_tokens.value === '' ? null : parseInt(f.max_tokens.value, 10),
       custom_system_prompt: f.custom_system_prompt.value, enabled: f.enabled.checked,
+      display_name: f.display_name.value.trim() || null,
+      description: f.description.value.trim() || null,
+      price_input: f.price_input.value.trim() || null,
+      price_output: f.price_output.value.trim() || null,
+      currency: f.currency.value.trim() || 'USD',
+      sort_order: f.sort_order.value === '' ? 0 : parseInt(f.sort_order.value, 10),
     };
     try {
       if (f.id.value) await api(`/models/${f.id.value}`, { method: 'PUT', body }); else await api('/models', { method: 'POST', body });
@@ -127,6 +137,9 @@
       const f = $('#modelForm');
       f.id.value = m.id; f.name.value = m.name; f.provider_id.value = m.provider_id; f.upstream_model.value = m.upstream_model;
       f.temperature.value = m.temperature ?? ''; f.max_tokens.value = m.max_tokens ?? ''; f.custom_system_prompt.value = m.custom_system_prompt || ''; f.enabled.checked = m.enabled;
+      f.display_name.value = m.display_name || ''; f.description.value = m.description || '';
+      f.price_input.value = m.price_input || ''; f.price_output.value = m.price_output || '';
+      f.currency.value = m.currency || 'USD'; f.sort_order.value = m.sort_order ?? 0;
       $('#modelFormTitle').textContent = 'Изменить модель: ' + m.name; $('#modelCancel').classList.remove('hidden'); f.scrollIntoView({ behavior: 'smooth' });
     }
   });
@@ -134,10 +147,10 @@
   // Keys
   async function loadKeys() {
     const keys = await api('/keys');
-    $('#keysBody').innerHTML = keys.map((k) => `<tr><td><code>${esc(k.prefix)}…</code></td><td>${esc(k.name || '—')}</td><td>${fmt(k.created_at)}</td><td>${fmt(k.last_used)}</td>
+    $('#keysBody').innerHTML = keys.map((k) => `<tr><td><code>${esc(k.prefix)}…</code></td><td>${esc(k.name || '—')}</td><td><span class="badge ${k.source === 'public' ? 'ok' : ''}">${esc(k.source || 'admin')}</span></td><td>${fmt(k.created_at)}</td><td>${fmt(k.last_used)}</td>
       <td>${k.daily_limit ?? '∞'}</td><td><span class="badge ${k.status === 'active' ? 'ok' : 'bad'}">${k.status}</span></td>
       <td>${k.status === 'active' ? `<button class="btn sm danger" data-act="revoke" data-id="${k.id}">Отозвать</button>` : `<button class="btn sm ghost" data-act="kdel" data-id="${k.id}">Удалить</button>`}</td></tr>`).join('')
-      || '<tr><td colspan="7" class="muted">Нет ключей</td></tr>';
+      || '<tr><td colspan="8" class="muted">Нет ключей</td></tr>';
   }
   $('#keyForm').addEventListener('submit', async (e) => {
     e.preventDefault(); const f = e.target;

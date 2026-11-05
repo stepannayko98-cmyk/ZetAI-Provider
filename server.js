@@ -34,8 +34,17 @@ app.use(helmet({
 }));
 app.use(cookieParser());
 
+const pub = path.join(__dirname, 'public');
+
 app.get('/health', (req, res) => res.status(200).json({ status: 'ok' }));
-app.get('/', (req, res) => res.json({ name: 'Zeta AI', base_url: (process.env.BASE_URL || '').replace(/\/+$/, '') + '/v1', health: '/health' }));
+
+// ---------- Public site (HTML) ----------
+app.get(['/', '/app', '/app/'], (req, res) => res.sendFile(path.join(pub, 'index.html')));
+app.use(express.static(pub, { index: false, maxAge: '1h' }));
+
+// ---------- /public (catalog + self-serve keys, no admin JWT) ----------
+app.use('/public', cors({ origin: '*', methods: ['GET', 'POST', 'OPTIONS'], allowedHeaders: ['Content-Type'] }));
+app.use('/public', express.json({ limit: '32kb' }), require('./routes/public'));
 
 // ---------- /v1 (public, CORS *) ----------
 const v1Limiter = rateLimit({
@@ -48,7 +57,6 @@ app.use('/v1', v1Limiter, express.json({ limit: '20mb' }), require('./routes/ope
 
 // ---------- /admin (same-origin only: no CORS headers) ----------
 app.use('/admin/api', express.json({ limit: '1mb' }), require('./routes/admin'));
-const pub = path.join(__dirname, 'public');
 app.get(['/admin', '/admin/'], (req, res) => res.sendFile(path.join(pub, 'admin.html')));
 app.use('/admin', express.static(pub, { index: false, maxAge: '1h' }));
 

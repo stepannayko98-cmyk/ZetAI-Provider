@@ -17,7 +17,7 @@
 
 <section id="app" class="hidden">
   <header class="topbar">
-    <div class="brand">ζ Zeta AI <span class="muted small" id="baseUrl"></span></div>
+    <div class="brand">ζ Zeta AI <span class="muted small" id="baseUrl"></span> <a class="muted small" href="/" target="_blank" rel="noopener">публичный сайт</a></div>
     <nav class="tabs">
       <button data-tab="dashboard" class="active">Дашборд</button>
       <button data-tab="providers">Провайдеры</button>
@@ -62,20 +62,30 @@
         <h2 id="modelFormTitle">Добавить модель</h2>
         <input type="hidden" name="id">
         <div class="row">
-          <label>Публичное имя<input name="name" required placeholder="zeta-gpt-4"></label>
+          <label>ID модели (API)<input name="name" required placeholder="zeta-gpt-4"></label>
+          <label>Отображаемое имя<input name="display_name" placeholder="GPT-4o (Zeta)"></label>
           <label>Провайдер<select name="provider_id" id="modelProvider" required></select></label>
-          <label>Upstream-модель<input name="upstream_model" list="upstreamModels" required placeholder="gpt-4o"><datalist id="upstreamModels"></datalist></label>
         </div>
         <div class="row">
+          <label>Upstream-модель<input name="upstream_model" list="upstreamModels" required placeholder="gpt-4o"><datalist id="upstreamModels"></datalist></label>
           <label>Temperature<input name="temperature" type="number" min="0" max="2" step="0.1" placeholder="(по умолчанию апстрима)"></label>
           <label>Max tokens<input name="max_tokens" type="number" min="1" step="1" placeholder="(не задано)"></label>
-          <label class="check"><input name="enabled" type="checkbox" checked> Включена</label>
+        </div>
+        <div class="row">
+          <label>Цена input (за 1M / текст)<input name="price_input" placeholder="2.50 или Free"></label>
+          <label>Цена output (за 1M / текст)<input name="price_output" placeholder="10.00"></label>
+          <label>Валюта<input name="currency" placeholder="USD" value="USD" maxlength="8"></label>
+          <label>Порядок (sort)<input name="sort_order" type="number" step="1" placeholder="0"></label>
+        </div>
+        <div class="row">
+          <label>Описание<textarea name="description" rows="2" placeholder="Краткое описание для публичной страницы"></textarea></label>
+          <label class="check"><input name="enabled" type="checkbox" checked> Включена (видна публично)</label>
         </div>
         <label>Custom System Prompt<textarea name="custom_system_prompt" rows="6" placeholder="Инжектится в каждый запрос к этой модели"></textarea></label>
         <div class="actions"><button type="button" class="btn" id="loadUpstream">Загрузить модели провайдера</button><button type="button" class="btn ghost hidden" id="modelCancel">Отмена</button><button class="btn primary">Сохранить</button></div>
       </form>
       <div class="card"><h2>Модели</h2>
-        <table><thead><tr><th>Имя</th><th>Провайдер</th><th>Upstream</th><th>Temp</th><th>Max</th><th>Prompt</th><th>Вкл</th><th></th></tr></thead><tbody id="modelsBody"></tbody></table>
+        <table><thead><tr><th>ID / Имя</th><th>Провайдер</th><th>Upstream</th><th>Цена</th><th>Sort</th><th>Prompt</th><th>Вкл</th><th></th></tr></thead><tbody id="modelsBody"></tbody></table>
       </div>
     </div>
 
@@ -93,7 +103,7 @@
         </div>
       </form>
       <div class="card"><h2>Ключи</h2>
-        <table><thead><tr><th>Префикс</th><th>Название</th><th>Создан</th><th>Last used</th><th>Лимит/день</th><th>Статус</th><th></th></tr></thead><tbody id="keysBody"></tbody></table>
+        <table><thead><tr><th>Префикс</th><th>Название</th><th>Источник</th><th>Создан</th><th>Last used</th><th>Лимит/день</th><th>Статус</th><th></th></tr></thead><tbody id="keysBody"></tbody></table>
       </div>
     </div>
 

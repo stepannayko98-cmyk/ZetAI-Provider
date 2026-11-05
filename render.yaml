@@ -17,4 +17,4 @@ services:
       - key: DATABASE_URL
         value: ./zeta.db
       - key: BASE_URL
-        value: https://zetaai.onrender.com
+        value: https://zetaai-lcgb.onrender.com

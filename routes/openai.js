@@ -146,17 +146,42 @@ function applyDefaults(body, vm, maxKey = 'max_tokens') {
   return body;
 }
 
+function toOaiModel(r) {
+  const out = {
+    id: r.name,
+    object: 'model',
+    created: Math.floor(new Date(r.created_at).getTime() / 1000) || 0,
+    owned_by: r.provider_name || 'zeta-ai',
+  };
+  if (r.display_name) out.display_name = r.display_name;
+  if (r.description) out.description = r.description;
+  const hasIn = r.price_input != null && String(r.price_input).trim() !== '';
+  const hasOut = r.price_output != null && String(r.price_output).trim() !== '';
+  if (hasIn || hasOut) {
+    out.pricing = {
+      input: hasIn ? String(r.price_input) : null,
+      output: hasOut ? String(r.price_output) : null,
+      currency: r.currency || 'USD',
+    };
+  }
+  return out;
+}
+
+const MODEL_SELECT = `SELECT m.name, m.display_name, m.description, m.price_input, m.price_output, m.currency,
+  m.created_at, p.name AS provider_name
+  FROM models m LEFT JOIN providers p ON p.id = m.provider_id`;
+
 router.get('/models', authApiKey, async (req, res, next) => {
   try {
-    const rows = await db.all('SELECT name, created_at FROM models WHERE enabled = 1 ORDER BY name');
-    res.json({ object: 'list', data: rows.map((r) => ({ id: r.name, object: 'model', created: Math.floor(new Date(r.created_at).getTime() / 1000) || 0, owned_by: 'zeta-ai' })) });
+    const rows = await db.all(`${MODEL_SELECT} WHERE m.enabled = 1 ORDER BY m.sort_order ASC, m.name ASC`);
+    res.json({ object: 'list', data: rows.map(toOaiModel) });
   } catch (e) { next(e); }
 });
 router.get('/models/:id', authApiKey, async (req, res, next) => {
   try {
-    const r = await db.get('SELECT name, created_at FROM models WHERE enabled = 1 AND name = ?', [req.params.id]);
+    const r = await db.get(`${MODEL_SELECT} WHERE m.enabled = 1 AND m.name = ?`, [req.params.id]);
     if (!r) return oaiErr(res, 404, `The model \`${req.params.id}\` does not exist`, 'invalid_request_error', 'model_not_found', 'model');
-    res.json({ id: r.name, object: 'model', created: Math.floor(new Date(r.created_at).getTime() / 1000) || 0, owned_by: 'zeta-ai' });
+    res.json(toOaiModel(r));
   } catch (e) { next(e); }
 });
 

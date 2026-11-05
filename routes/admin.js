@@ -91,6 +91,7 @@ router.post('/providers/test', wrap(async (req, res) => {
 }));
 
 // ---------- Models ----------
+const optionalText = z.union([z.string().trim().max(500), z.null()]).optional();
 const modelSchema = z.object({
   name: z.string().trim().min(1).max(100).regex(/^[A-Za-z0-9._:\/-]+$/, 'allowed: letters, digits, . _ : / -'),
   provider_id: z.string().min(1),
@@ -99,26 +100,65 @@ const modelSchema = z.object({
   max_tokens: z.union([z.number().int().positive().max(2000000), z.null()]).optional(),
   custom_system_prompt: z.string().max(100000).optional().nullable(),
   enabled: z.boolean().optional(),
+  display_name: z.union([z.string().trim().max(200), z.null()]).optional(),
+  description: z.union([z.string().trim().max(2000), z.null()]).optional(),
+  price_input: optionalText,
+  price_output: optionalText,
+  currency: z.union([z.string().trim().max(8), z.null()]).optional(),
+  sort_order: z.union([z.number().int().min(-100000).max(100000), z.null()]).optional(),
 });
+
+function modelRow(m) {
+  return {
+    ...m,
+    enabled: !!Number(m.enabled),
+    display_name: m.display_name || null,
+    description: m.description || null,
+    price_input: m.price_input || null,
+    price_output: m.price_output || null,
+    currency: m.currency || 'USD',
+    sort_order: Number(m.sort_order) || 0,
+  };
+}
+
 router.get('/models', wrap(async (req, res) => {
-  const rows = await db.all('SELECT m.*, p.name AS provider_name FROM models m LEFT JOIN providers p ON p.id = m.provider_id ORDER BY m.name');
-  res.json(rows.map((m) => ({ ...m, enabled: !!Number(m.enabled) })));
+  const rows = await db.all(
+    'SELECT m.*, p.name AS provider_name FROM models m LEFT JOIN providers p ON p.id = m.provider_id ORDER BY m.sort_order ASC, m.name ASC',
+  );
+  res.json(rows.map(modelRow));
 }));
 router.post('/models', wrap(async (req, res) => {
   const b = parse(modelSchema, req, res); if (!b) return;
   if (!(await db.get('SELECT id FROM providers WHERE id = ?', [b.provider_id]))) return res.status(400).json({ error: 'Провайдер не найден' });
   if (await db.get('SELECT id FROM models WHERE name = ?', [b.name])) return res.status(409).json({ error: 'Модель с таким именем уже есть' });
   const mid = id();
-  await db.run('INSERT INTO models (id,name,provider_id,upstream_model,temperature,max_tokens,custom_system_prompt,enabled,created_at) VALUES (?,?,?,?,?,?,?,?,?)',
-    [mid, b.name, b.provider_id, b.upstream_model, b.temperature ?? null, b.max_tokens ?? null, b.custom_system_prompt || null, b.enabled === false ? 0 : 1, now()]);
+  await db.run(
+    `INSERT INTO models (id,name,provider_id,upstream_model,temperature,max_tokens,custom_system_prompt,enabled,created_at,
+      display_name,description,price_input,price_output,currency,sort_order)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+    [
+      mid, b.name, b.provider_id, b.upstream_model, b.temperature ?? null, b.max_tokens ?? null,
+      b.custom_system_prompt || null, b.enabled === false ? 0 : 1, now(),
+      b.display_name || null, b.description || null, b.price_input || null, b.price_output || null,
+      b.currency || 'USD', b.sort_order ?? 0,
+    ],
+  );
   res.status(201).json({ id: mid });
 }));
 router.put('/models/:id', wrap(async (req, res) => {
   const b = parse(modelSchema, req, res); if (!b) return;
   const dup = await db.get('SELECT id FROM models WHERE name = ? AND id <> ?', [b.name, req.params.id]);
   if (dup) return res.status(409).json({ error: 'Модель с таким именем уже есть' });
-  const r = await db.run('UPDATE models SET name=?,provider_id=?,upstream_model=?,temperature=?,max_tokens=?,custom_system_prompt=?,enabled=? WHERE id=?',
-    [b.name, b.provider_id, b.upstream_model, b.temperature ?? null, b.max_tokens ?? null, b.custom_system_prompt || null, b.enabled === false ? 0 : 1, req.params.id]);
+  const r = await db.run(
+    `UPDATE models SET name=?,provider_id=?,upstream_model=?,temperature=?,max_tokens=?,custom_system_prompt=?,enabled=?,
+      display_name=?,description=?,price_input=?,price_output=?,currency=?,sort_order=? WHERE id=?`,
+    [
+      b.name, b.provider_id, b.upstream_model, b.temperature ?? null, b.max_tokens ?? null,
+      b.custom_system_prompt || null, b.enabled === false ? 0 : 1,
+      b.display_name || null, b.description || null, b.price_input || null, b.price_output || null,
+      b.currency || 'USD', b.sort_order ?? 0, req.params.id,
+    ],
+  );
   res.status(r.changes ? 200 : 404).json({ ok: !!r.changes });
 }));
 router.patch('/models/:id/toggle', wrap(async (req, res) => {
@@ -133,13 +173,13 @@ router.delete('/models/:id', wrap(async (req, res) => {
 
 // ---------- API keys ----------
 router.get('/keys', wrap(async (req, res) => {
-  const rows = await db.all('SELECT id,name,prefix,created_at,last_used,revoked,daily_limit FROM api_keys ORDER BY created_at DESC');
-  res.json(rows.map((k) => ({ ...k, status: Number(k.revoked) ? 'revoked' : 'active' })));
+  const rows = await db.all('SELECT id,name,prefix,created_at,last_used,revoked,daily_limit,source FROM api_keys ORDER BY created_at DESC');
+  res.json(rows.map((k) => ({ ...k, source: k.source || 'admin', status: Number(k.revoked) ? 'revoked' : 'active' })));
 }));
 router.post('/keys', wrap(async (req, res) => {
   const b = parse(z.object({ name: z.string().trim().max(100).optional(), daily_limit: z.union([z.number().int().positive(), z.null()]).optional() }), req, res); if (!b) return;
   const k = generateApiKey(); const kid = id();
-  await db.run('INSERT INTO api_keys (id,name,key_hash,prefix,created_at,daily_limit,revoked) VALUES (?,?,?,?,?,?,0)', [kid, b.name || null, k.hash, k.prefix, now(), b.daily_limit ?? null]);
+  await db.run('INSERT INTO api_keys (id,name,key_hash,prefix,created_at,daily_limit,revoked,source) VALUES (?,?,?,?,?,?,0,?)', [kid, b.name || null, k.hash, k.prefix, now(), b.daily_limit ?? null, 'admin']);
   res.status(201).json({ id: kid, key: k.key, prefix: k.prefix });
 }));
 router.post('/keys/:id/revoke', wrap(async (req, res) => {

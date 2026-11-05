@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Zeta AI — OpenAI-совместимый API</title>
+<meta name="description" content="Zeta AI — список моделей и самообслуживание API-ключей">
+<link rel="stylesheet" href="/app.css">
+</head>
+<body>
+<header class="site-header">
+  <div class="wrap bar">
+    <div class="brand">ζ <span>Zeta AI</span></div>
+    <nav>
+      <a href="#models">Модели</a>
+      <a href="#keys">API-ключ</a>
+      <a href="#howto">Как начать</a>
+      <a class="admin-link" href="/admin">Админ</a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+  <section class="hero">
+    <h1>OpenAI-совместимый API<br><span class="grad">для ваших приложений</span></h1>
+    <p class="lead">Один Base URL, ключи <code>zeta-sk-…</code>, виртуальные модели с прозрачными ценами. Подключается как обычный OpenAI SDK.</p>
+    <div class="hero-actions">
+      <a class="btn primary" href="#keys">Получить API-ключ</a>
+      <a class="btn ghost" href="#models">Смотреть модели</a>
+    </div>
+    <div class="baseurl-card">
+      <span class="label">Base URL</span>
+      <code id="baseUrl">https://zetaai-lcgb.onrender.com/v1</code>
+      <button type="button" class="btn sm" id="copyBase">Копировать</button>
+    </div>
+  </section>
+
+  <section id="models" class="block">
+    <div class="block-head">
+      <h2>Доступные модели</h2>
+      <button type="button" class="btn sm" id="refreshModels">Обновить</button>
+    </div>
+    <p class="muted" id="modelsStatus">Загрузка…</p>
+    <div id="modelsGrid" class="models-grid"></div>
+  </section>
+
+  <section id="keys" class="block">
+    <h2>Получить API-ключ</h2>
+    <p class="muted">Ключ создаётся сразу, без полноценной регистрации. Показывается <b>один раз</b> — сохраните его.</p>
+    <form id="keyForm" class="card form">
+      <div class="row">
+        <label>Никнейм (опционально)<input name="nickname" maxlength="80" placeholder="например: my-app"></label>
+        <label>Email (опционально)<input name="email" type="email" maxlength="200" placeholder="you@example.com"></label>
+      </div>
+      <div class="actions">
+        <button class="btn primary" type="submit">Получить API-ключ</button>
+      </div>
+      <p id="keyError" class="error"></p>
+      <div id="newKey" class="newkey hidden">
+        <p><b>Скопируйте ключ сейчас — он больше не будет показан!</b></p>
+        <div class="copyrow"><code id="newKeyValue"></code><button type="button" class="btn" id="copyKey">Копировать</button></div>
+        <p class="muted small" id="newKeyHint"></p>
+      </div>
+    </form>
+  </section>
+
+  <section id="howto" class="block">
+    <h2>Как начать</h2>
+    <ol class="steps">
+      <li>Скопируйте Base URL: <code id="baseUrl2">https://zetaai-lcgb.onrender.com/v1</code></li>
+      <li>Получите ключ <code>zeta-sk-…</code> выше</li>
+      <li>Выберите модель из списка (поле <code>id</code>)</li>
+      <li>Отправьте запрос как в OpenAI</li>
+    </ol>
+    <pre class="code"><code>curl https://zetaai-lcgb.onrender.com/v1/chat/completions \
+  -H "Authorization: Bearer zeta-sk-XXXX" \
+  -H "Content-Type: application/json" \
+  -d '{"model":"MODEL_ID","messages":[{"role":"user","content":"Привет!"}]}'</code></pre>
+    <pre class="code"><code>from openai import OpenAI
+client = OpenAI(
+  base_url="https://zetaai-lcgb.onrender.com/v1",
+  api_key="zeta-sk-XXXX",
+)
+r = client.chat.completions.create(
+  model="MODEL_ID",
+  messages=[{"role": "user", "content": "Привет!"}],
+)
+print(r.choices[0].message.content)</code></pre>
+  </section>
+</main>
+
+<footer class="site-footer">
+  <div class="wrap">
+    <span>ζ Zeta AI</span>
+    <a href="/admin">Админ-панель</a>
+    <a href="/health">Health</a>
+    <a href="/public/models">JSON каталог</a>
+  </div>
+</footer>
+<div id="toast" class="toast hidden"></div>
+<script src="/app.js"></script>
+</body>
+</html>

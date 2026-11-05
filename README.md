@@ -2,8 +2,9 @@
 
 Zeta AI — прокси/агрегатор с API 1-в-1 как у OpenAI. Вы подключаете upstream-провайдеров (OpenAI, OpenRouter, Gemini OpenAI-compat, Groq, DeepSeek и т.д.), создаёте «виртуальные модели» с собственным system-prompt и выдаёте клиентам ключи `zeta-sk-…`.
 
-- **Base URL:** `https://ZetaAI.onrender.com/v1` (то же самое: `https://zetaai.onrender.com/v1`; корень сервиса — https://zetaai.onrender.com/)
-- **Админка:** `https://zetaai.onrender.com/admin`
+- **Base URL:** `https://zetaai-lcgb.onrender.com/v1` (то же самое: `https://zetaai-lcgb.onrender.com/v1`; корень сервиса — https://zetaai-lcgb.onrender.com/)
+- **Публичный сайт:** `https://zetaai-lcgb.onrender.com/` — список моделей и «Получить API-ключ»
+- **Админка:** `https://zetaai-lcgb.onrender.com/admin`
 - **Health:** `GET /health` → `{"status":"ok"}`
 
 ## Почему Node.js + Express, а не FastAPI
@@ -17,7 +18,10 @@ Zeta AI — прокси/агрегатор с API 1-в-1 как у OpenAI. Вы
 | POST | `/v1/chat/completions` | чат, поддерживает `stream: true` (SSE) |
 | POST | `/v1/completions` | legacy completions |
 | POST | `/v1/embeddings` | эмбеддинги |
-| GET | `/v1/models` | включённые виртуальные модели |
+| GET | `/v1/models` | включённые виртуальные модели (+ owned_by, pricing) |
+| GET | `/public/models` | публичный каталог моделей (без ключа) |
+| POST | `/public/keys` | самообслуживание: создать `zeta-sk-…` (лимит 3/час с IP) |
+| GET | `/` | публичная HTML-страница (модели + получить ключ) |
 | GET | `/health` | health-check |
 
 Ошибки в формате OpenAI: `{"error":{"message","type","param","code"}}`. Ошибки апстрима проксируются с исходным статусом. Невалидный JSON → 400.
@@ -57,8 +61,8 @@ git push -u origin main
 **Вариант B — вручную:** New → Web Service → репозиторий →
 - Runtime: **Docker** (Dockerfile в корне), *или* Runtime: Node с Build Command `npm ci --omit=dev`, Start Command `node server.js`
 - Health Check Path: `/health`
-- Environment: `NODE_ENV=production`, `ADMIN_PASSWORD=<ваш пароль>`, `JWT_SECRET=<случайная строка>`, `DATABASE_URL=/app/data/zeta.db` (или postgres-URL), `BASE_URL=https://zetaai.onrender.com`
-- Имя сервиса `zetaai` → адрес `https://zetaai.onrender.com`
+- Environment: `NODE_ENV=production`, `ADMIN_PASSWORD=<ваш пароль>`, `JWT_SECRET=<случайная строка>`, `DATABASE_URL=/app/data/zeta.db` (или postgres-URL), `BASE_URL=https://zetaai-lcgb.onrender.com`
+- Имя сервиса `zetaai` → адрес `https://zetaai-lcgb.onrender.com`
 
 > ⚠️ **Диск на бесплатном плане Render — эфемерный.** SQLite-файл стирается при каждом деплое/рестарте: пропадут провайдеры, модели и ключи. Для продакшена:
 > - **Persistent Disk** (платные планы): Settings → Disks → Mount Path `/app/data`, `DATABASE_URL=/app/data/zeta.db` (уже описано в `render.yaml`, требует plan `starter`+). Для free-плана удалите блок `disk` из `render.yaml`.
@@ -69,7 +73,7 @@ git push -u origin main
 ## Первая настройка в /admin
 1. Откройте `/admin`, введите пароль.
 2. **Провайдеры** → имя, Base URL (например `https://api.openai.com/v1`, `https://openrouter.ai/api/v1`, `https://generativelanguage.googleapis.com/v1beta/openai`), API-ключ → «Проверить соединение» (GET `{base_url}/models`) → «Добавить». Если в URL нет пути, автоматически добавится `/v1`; хвостовые `/` убираются.
-3. **Модели** → публичное имя (`zeta-gpt-4`), провайдер, «Загрузить модели провайдера» → выберите upstream-модель, temperature / max_tokens, Custom System Prompt, «Включена» → «Сохранить».
+3. **Модели** → ID (`zeta-gpt-4`), отображаемое имя, описание, цены input/output, валюта, sort_order, провайдер, upstream-модель, temperature / max_tokens, Custom System Prompt, «Включена» → «Сохранить». Включённые модели появляются на публичной странице `/`.
 4. **API-ключи** → «Сгенерировать ключ» → скопируйте (показывается **один раз**). Можно задать лимит запросов/день. Отзыв — кнопка «Отозвать».
 5. **Дашборд** и **Логи** — статистика и последние запросы.
 
@@ -81,14 +85,14 @@ git push -u origin main
 ## Примеры подключения
 ### curl
 ```bash
-curl https://zetaai.onrender.com/v1/chat/completions \
+curl https://zetaai-lcgb.onrender.com/v1/chat/completions \
   -H "Authorization: Bearer zeta-sk-XXXX" -H "Content-Type: application/json" \
   -d '{"model":"zeta-gpt-4","messages":[{"role":"user","content":"Привет!"}],"stream":false}'
 ```
 ### Python (openai SDK)
 ```python
 from openai import OpenAI
-client = OpenAI(base_url="https://zetaai.onrender.com/v1", api_key="zeta-sk-XXXX")
+client = OpenAI(base_url="https://zetaai-lcgb.onrender.com/v1", api_key="zeta-sk-XXXX")
 r = client.chat.completions.create(model="zeta-gpt-4", messages=[{"role": "user", "content": "Привет!"}])
 print(r.choices[0].message.content)
 for chunk in client.chat.completions.create(model="zeta-gpt-4", messages=[{"role":"user","content":"Расскажи анекдот"}], stream=True):
@@ -97,12 +101,12 @@ for chunk in client.chat.completions.create(model="zeta-gpt-4", messages=[{"role
 ### JavaScript (openai SDK)
 ```js
 import OpenAI from 'openai';
-const client = new OpenAI({ baseURL: 'https://zetaai.onrender.com/v1', apiKey: 'zeta-sk-XXXX' });
+const client = new OpenAI({ baseURL: 'https://zetaai-lcgb.onrender.com/v1', apiKey: 'zeta-sk-XXXX' });
 const stream = await client.chat.completions.create({ model: 'zeta-gpt-4', messages: [{ role: 'user', content: 'Привет!' }], stream: true });
 for await (const c of stream) process.stdout.write(c.choices[0]?.delta?.content || '');
 ```
 ### OpenWebUI / LibreChat / SillyTavern / Cursor
-OpenWebUI: Settings → Connections → OpenAI API → URL `https://zetaai.onrender.com/v1`, Key `zeta-sk-…` → модели подтянутся из `/v1/models`. В остальных клиентах аналогично: «OpenAI-compatible», base URL + ключ.
+OpenWebUI: Settings → Connections → OpenAI API → URL `https://zetaai-lcgb.onrender.com/v1`, Key `zeta-sk-…` → модели подтянутся из `/v1/models`. В остальных клиентах аналогично: «OpenAI-compatible», base URL + ключ.
 
 ## Переменные окружения
 | Переменная | Описание |
