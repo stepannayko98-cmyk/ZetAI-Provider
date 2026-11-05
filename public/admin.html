@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Zeta AI — Админ-панель</title>
+<link rel="stylesheet" href="/admin/admin.css">
+</head>
+<body>
+<section id="login" class="center hidden">
+  <form id="loginForm" class="card login">
+    <h1>ζ Zeta AI</h1><p class="muted">Вход в админ-панель</p>
+    <input type="password" id="password" placeholder="Пароль" autocomplete="current-password" required>
+    <button class="btn primary" type="submit">Войти</button>
+    <p id="loginError" class="error"></p>
+  </form>
+</section>
+
+<section id="app" class="hidden">
+  <header class="topbar">
+    <div class="brand">ζ Zeta AI <span class="muted small" id="baseUrl"></span></div>
+    <nav class="tabs">
+      <button data-tab="dashboard" class="active">Дашборд</button>
+      <button data-tab="providers">Провайдеры</button>
+      <button data-tab="models">Модели</button>
+      <button data-tab="keys">API-ключи</button>
+      <button data-tab="logs">Логи</button>
+    </nav>
+    <button id="logout" class="btn ghost">Выйти</button>
+  </header>
+  <main>
+    <div id="tab-dashboard" class="tab">
+      <div class="grid stats">
+        <div class="card stat"><span>Всего запросов</span><b id="sTotal">0</b></div>
+        <div class="card stat"><span>Ошибок</span><b id="sErr">0</b></div>
+        <div class="card stat"><span>За 24ч</span><b id="sDay">0</b></div>
+        <div class="card stat"><span>Активных ключей</span><b id="sKeys">0</b></div>
+        <div class="card stat"><span>Включённых моделей</span><b id="sModels">0</b></div>
+        <div class="card stat"><span>Токенов</span><b id="sTokens">0</b></div>
+      </div>
+      <div class="card"><h2>Топ моделей</h2><table><thead><tr><th>Модель</th><th>Запросов</th></tr></thead><tbody id="topModels"></tbody></table></div>
+    </div>
+
+    <div id="tab-providers" class="tab hidden">
+      <form id="providerForm" class="card form">
+        <h2>Добавить провайдера</h2>
+        <div class="row">
+          <label>Имя<input name="name" required placeholder="OpenAI"></label>
+          <label>Base URL<input name="base_url" required placeholder="https://api.openai.com/v1"></label>
+          <label>API key<input name="api_key" type="password" required autocomplete="off"></label>
+        </div>
+        <div class="actions"><button type="button" class="btn" id="providerTestNew">Проверить соединение</button><button class="btn primary">Добавить</button></div>
+        <pre id="providerTestOut" class="out hidden"></pre>
+      </form>
+      <div class="card"><h2>Провайдеры</h2>
+        <table><thead><tr><th>Имя</th><th>Base URL</th><th>Ключ</th><th></th></tr></thead><tbody id="providersBody"></tbody></table>
+        <pre id="providerModelsOut" class="out hidden"></pre>
+      </div>
+    </div>
+
+    <div id="tab-models" class="tab hidden">
+      <form id="modelForm" class="card form">
+        <h2 id="modelFormTitle">Добавить модель</h2>
+        <input type="hidden" name="id">
+        <div class="row">
+          <label>Публичное имя<input name="name" required placeholder="zeta-gpt-4"></label>
+          <label>Провайдер<select name="provider_id" id="modelProvider" required></select></label>
+          <label>Upstream-модель<input name="upstream_model" list="upstreamModels" required placeholder="gpt-4o"><datalist id="upstreamModels"></datalist></label>
+        </div>
+        <div class="row">
+          <label>Temperature<input name="temperature" type="number" min="0" max="2" step="0.1" placeholder="(по умолчанию апстрима)"></label>
+          <label>Max tokens<input name="max_tokens" type="number" min="1" step="1" placeholder="(не задано)"></label>
+          <label class="check"><input name="enabled" type="checkbox" checked> Включена</label>
+        </div>
+        <label>Custom System Prompt<textarea name="custom_system_prompt" rows="6" placeholder="Инжектится в каждый запрос к этой модели"></textarea></label>
+        <div class="actions"><button type="button" class="btn" id="loadUpstream">Загрузить модели провайдера</button><button type="button" class="btn ghost hidden" id="modelCancel">Отмена</button><button class="btn primary">Сохранить</button></div>
+      </form>
+      <div class="card"><h2>Модели</h2>
+        <table><thead><tr><th>Имя</th><th>Провайдер</th><th>Upstream</th><th>Temp</th><th>Max</th><th>Prompt</th><th>Вкл</th><th></th></tr></thead><tbody id="modelsBody"></tbody></table>
+      </div>
+    </div>
+
+    <div id="tab-keys" class="tab hidden">
+      <form id="keyForm" class="card form">
+        <h2>Сгенерировать ключ</h2>
+        <div class="row">
+          <label>Название (опц.)<input name="name" placeholder="Мой клиент"></label>
+          <label>Лимит запросов/день (опц.)<input name="daily_limit" type="number" min="1"></label>
+        </div>
+        <div class="actions"><button class="btn primary">Сгенерировать ключ</button></div>
+        <div id="newKey" class="newkey hidden">
+          <p><b>Скопируйте ключ сейчас — он больше не будет показан!</b></p>
+          <div class="copyrow"><code id="newKeyValue"></code><button type="button" class="btn" id="copyKey">Копировать</button></div>
+        </div>
+      </form>
+      <div class="card"><h2>Ключи</h2>
+        <table><thead><tr><th>Префикс</th><th>Название</th><th>Создан</th><th>Last used</th><th>Лимит/день</th><th>Статус</th><th></th></tr></thead><tbody id="keysBody"></tbody></table>
+      </div>
+    </div>
+
+    <div id="tab-logs" class="tab hidden">
+      <div class="card">
+        <div class="actions spread"><h2>Логи запросов</h2>
+          <div><select id="logLimit"><option>50</option><option selected>100</option><option>500</option></select>
+          <button class="btn" id="refreshLogs">Обновить</button><button class="btn danger" id="clearLogs">Очистить</button></div></div>
+        <table><thead><tr><th>Время</th><th>Ключ</th><th>Endpoint</th><th>Модель</th><th>Статус</th><th>Токены</th><th>Длит., мс</th><th>Ошибка</th></tr></thead><tbody id="logsBody"></tbody></table>
+      </div>
+    </div>
+  </main>
+</section>
+<div id="toast" class="toast hidden"></div>
+<script src="/admin/admin.js"></script>
+</body>
+</html>
